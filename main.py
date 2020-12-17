@@ -2,6 +2,7 @@ import json
 import discord
 from discord.ext import commands
 from vote import Vote
+from time import sleep
 
 with open('secrets.json') as file:
     data = json.load(file)
@@ -39,7 +40,10 @@ def get_voters(guild):
 
     voters = []
     for member in vchannel.members:
-        voters.append(member)
+        # only want undeafened and unmuted users
+        vs = member.voice  # member voice state
+        if not vs.deaf and not vs.mute and not vs.self_mute and not vs.self_deaf:
+            voters.append(member)
 
     return voters
 
@@ -51,9 +55,13 @@ async def vote_mute_user(ctx, user: discord.Member):
     if vote.active:
         response = f"Sorry {ctx.message.author.mention}, a vote is already in progress."
     else:
-        vote = Vote(get_voters(ctx.guild), user)
+        voters = get_voters(ctx.guild)
+        vote = Vote(voters, user)
         vote.activate()  # start vote
-        response = f"{ctx.message.author.nick} has started a vote to server mute {user.display_name}"
+        response = f"{ctx.message.author.nick} has started a vote to server mute {user.display_name}. The current " \
+                   f"voters are:\n"
+
+        response += "\n".join(v.display_name for v in voters)
     await ctx.send(response)
 
 
@@ -72,5 +80,6 @@ async def confirm_mute(ctx):
             await ctx.send(response)
 
             await vote.mutee.edit(mute=True)
+
 
 bot.run(TOKEN)
